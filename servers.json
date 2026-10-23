@@ -1,8 +1,8 @@
 {
     "servers": [
         {
-            "name": "SideStore",
-            "address": "https://ani.sidestore.io"
+            "name": "SideHustle",
+            "address": "https://SideHustle.sidestore.io"
         },
         {
             "name": "SideStore (.app)",
