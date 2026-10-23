@@ -1,0 +1,61 @@
+name: Deploy static content to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-cache-${{ hashFiles('.github/apt-packs.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-cache-
+      - name: Update APT cache
+        run: sudo apt-get update
+      - name: Install dependencies
+        run: sudo apt-get install -y coreutils jq
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Lint servers.json
+        run: |
+          if jq empty servers.json > /dev/null 2>&1; then
+            echo "servers.json is valid"
+          else
+            echo "Invalid JSON file detected in servers.json"
+            exit 1
+          fi
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Generate hash file
+        if: ${{ vars.CREATE_CACHE_KEY == 'true' }}
+        run: |
+          sha256sum servers.json | cut -d ' ' -f1 | cut -c1-8 > servers.json.hash
+      - name: Add hash URL to servers.json
+        if: ${{ vars.CREATE_CACHE_KEY == 'true' }}
+        run: |
+          jq --arg url "https://$(cat CNAME)/servers.json.hash" '. + {"cache": $url}' servers.json > tmp.json && mv tmp.json servers.json
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
